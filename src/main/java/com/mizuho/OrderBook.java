@@ -15,15 +15,22 @@ public class OrderBook {
     public OrderBook() {}
 
     // Time complexity to insert or remove an element from a Skip List Map is O[log(n)]
-    private Map<Double, List<Order> > bidQueue = new ConcurrentSkipListMap<>();
-    private Map<Double, List<Order> > offerQueue = new ConcurrentSkipListMap<>(Comparator.reverseOrder());
+    // Had we only wanted to see level 1 order book data (did not want to see depth of
+    // market), then a PriorityBlockingQueue class (i.e. thread safe heap) would offer
+    // better performance but as we need to see market depth, I am using the
+    // ConcurrentSkipListMap class.
+    // The Map declares a LinkedList type in the generics (rather than just a List) as
+    // we can then use the addLast() method which has O[1] in Java as the LinkedList
+    // class maintains a reference to its tail.
+    private Map<Double, LinkedList<Order> > bidQueue = new ConcurrentSkipListMap<>();
+    private Map<Double, LinkedList<Order> > offerQueue = new ConcurrentSkipListMap<>(Comparator.reverseOrder());
 
-    // No need to sort keys by order here so we can use a ConcurrentHashMap which offers O[1] performance
+    // No need to sort keys by order here, so we can use a ConcurrentHashMap which offers O[1] performance
     private Map<Long, Order> mapIdToOrder = new ConcurrentHashMap<>();
 
     public void addOrder(Order order) throws Exception {
         log.debug(() -> "addOrder() called for order id:" + order.getId());
-        Map<Double, List<Order> > queue;
+        Map<Double, LinkedList<Order> > queue;
         if ( order.getSide() == 'B' ) {
             queue = bidQueue;
         }
@@ -35,8 +42,9 @@ public class OrderBook {
         }
 
         synchronized (queue) {
-            List<Order> orders = queue.computeIfAbsent(order.getPrice(), i -> new LinkedList<>());
-            orders.add(order);
+            // Java LinkedList offers good performance here as we are always adding to the tail.
+            LinkedList<Order> orders = queue.computeIfAbsent(order.getPrice(), i -> new LinkedList<>());
+            orders.addLast(order);
         }
 
         mapIdToOrder.put(order.getId(), order);
@@ -47,7 +55,12 @@ public class OrderBook {
         log.debug(() -> "removeOrder() called for order id:" + id);
 
         Order order = mapIdToOrder.get(id);
-        Map<Double, List<Order> > queue = null;
+        if ( order == null ) {
+            log.warn(() -> "removeOrder() did not find order with id:" + id);
+            return;
+        }
+
+        Map<Double, LinkedList<Order> > queue = null;
         if ( order.getSide() == 'B' ) {
             queue = bidQueue;
         }
@@ -55,12 +68,20 @@ public class OrderBook {
             queue = offerQueue;
         }
         else {
-            // Never get here as we check the side when the order was added.
+            // Never get here as we validated the side when the order was added.
         }
 
         synchronized (queue) {
             List<Order> orders = queue.get(order.getPrice());
-            orders.remove(order);
+            if ( orders != null ) {
+                orders.remove(order);
+                if ( orders.size() == 0)
+                    queue.remove(order.getPrice());
+            }
+            else {
+                log.warn(() -> "removeOrder() did not find order with id:" + id);
+            }
+
             mapIdToOrder.remove(id);
         }
 
