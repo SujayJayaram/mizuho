@@ -59,8 +59,8 @@ public class OrderBook {
     // The Map declares a <LinkedList> type in the generics (rather than just a List) as
     // we can then use the addLast() method which has O[1] in Java, as the LinkedList
     // class maintains a reference to its tail.
-    private Map<Double, LinkedList<OrderHolder> > bidQueue = new ConcurrentSkipListMap<>();
-    private Map<Double, LinkedList<OrderHolder> > offerQueue = new ConcurrentSkipListMap<>(Comparator.reverseOrder());
+    private Map<Double, LinkedList<OrderHolder> > bidQueue = new ConcurrentSkipListMap<>(Comparator.reverseOrder());
+    private Map<Double, LinkedList<OrderHolder> > offerQueue = new ConcurrentSkipListMap<>();
 
     // No need to sort keys by order here, so we can use a ConcurrentHashMap which offers O[1] performance
     private Map<Long, OrderHolder> mapIdToOrder = new ConcurrentHashMap<>();
@@ -103,9 +103,10 @@ public class OrderBook {
         if ( orders != null ) {
             synchronized (orders) {
                 orders.remove(orderHolder);
-                if (orders.size() == 0)
+                if (orders.size() == 0) {
                     // This call below is why the addOrder() method does a final put().
                     queue.remove(orderHolder.getPrice());
+                }
             }
         }
         else {
@@ -119,8 +120,9 @@ public class OrderBook {
     public synchronized void modifyOrderSize(long id, long size) throws Exception {
         log.debug(() -> "modifyOrderSize() called for order id:" + id + " and size: " + size);
         OrderHolder orderHolder = mapIdToOrder.get(id);
-        if ( orderHolder == null )
-            return; // Might have already been removed by another thread
+        if ( orderHolder == null ) {
+            throw new Exception("Could not find order with id: " + id); // Might have already been removed by another thread
+        }
 
         orderHolder.setSize(size);
         log.debug(() -> "modifyOrderSize() exits for order id:" + id + " and size: " + size);

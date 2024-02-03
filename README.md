@@ -11,4 +11,7 @@ As this code is latency sensitive, I am not explicitly validating parameters and
 Similarly for non latency sensitive code, we would check that order id params are not zero or negative, but here, we rely on the caller
 supplying valid values - its a matter of system policy.
 
+- I assume I cannot change the Order class hence creating an OrderHolder class
+- I tend to wite equals() and hashCode() for all Pojos (and also make them 
+implement Comparable so they can take advantage of Java 8 HashMap optimisations for large buckets)
 - Order class should ideally have a timestamp attribute (MiFID2 requires microsecond timestamps)
