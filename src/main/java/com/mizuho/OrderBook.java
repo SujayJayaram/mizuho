@@ -6,102 +6,135 @@ import org.apache.logging.log4j.Logger;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentSkipListMap;
+import java.util.concurrent.atomic.AtomicLong;
+import java.util.stream.Collectors;
 
 public class OrderBook {
     private static final Logger log = LogManager.getLogger(OrderBook.class);
 
     // In reality the OrderBook would be per security Id (e.g. ISIN, CUSIP etc) so we may
-    // wish to store that in this object.
+    // wish to store that in this object as well.
     public OrderBook() {}
 
-    // Time complexity to insert or remove an element from a Skip List Map is O[log(n)]
+    // Internal class allowing size to be changed
+    private static class OrderHolder {
+        private long id; // id of order
+        private double price;
+        private char side; // B "Bid" or O "Offer"
+        private AtomicLong size;
+
+        private OrderHolder(Order order) {
+            this.id = order.getId();
+            this.price = order.getPrice();
+            this.side = order.getSide();
+            this.size = new AtomicLong(order.getSize());
+        }
+
+        public long getId() {
+            return id;
+        }
+
+        public double getPrice() {
+            return price;
+        }
+
+        public char getSide() {
+            return side;
+        }
+
+        public long getSize() {
+            return size.get();
+        }
+
+        public void setSize(long s) {
+            size.set(s);
+        }
+    }
+
+    // Time complexity to insert or remove an element from a ConcurrentSkipListMap is O[log(n)]
     // Had we only wanted to see level 1 order book data (did not want to see depth of
-    // market), then a PriorityBlockingQueue class (i.e. thread safe heap) would offer
-    // better performance but as we need to see market depth, I am using the
+    // market), then a PriorityBlockingQueue class (i.e. thread safe heap) would perhaps
+    // be more appropriate, but as we need to see market depth too, I am using the
     // ConcurrentSkipListMap class.
-    // The Map declares a LinkedList type in the generics (rather than just a List) as
-    // we can then use the addLast() method which has O[1] in Java as the LinkedList
+    // The Map declares a <LinkedList> type in the generics (rather than just a List) as
+    // we can then use the addLast() method which has O[1] in Java, as the LinkedList
     // class maintains a reference to its tail.
-    private Map<Double, LinkedList<Order> > bidQueue = new ConcurrentSkipListMap<>();
-    private Map<Double, LinkedList<Order> > offerQueue = new ConcurrentSkipListMap<>(Comparator.reverseOrder());
+    private Map<Double, LinkedList<OrderHolder> > bidQueue = new ConcurrentSkipListMap<>();
+    private Map<Double, LinkedList<OrderHolder> > offerQueue = new ConcurrentSkipListMap<>(Comparator.reverseOrder());
 
     // No need to sort keys by order here, so we can use a ConcurrentHashMap which offers O[1] performance
-    private Map<Long, Order> mapIdToOrder = new ConcurrentHashMap<>();
+    private Map<Long, OrderHolder> mapIdToOrder = new ConcurrentHashMap<>();
 
     public void addOrder(Order order) throws Exception {
         log.debug(() -> "addOrder() called for order id:" + order.getId());
-        Map<Double, LinkedList<Order> > queue = getQueueFromSide(order.getSide());
 
-        synchronized (queue) {
+        if ( order.getSize() <= 0 || order.getPrice() <= 0.0 )
+            throw new Exception("Invalid size or price for order with id: " + order.getId());
+
+        Map<Double, LinkedList<OrderHolder> > queue = getQueueFromSide(order.getSide());
+
+        OrderHolder orderHolder = new OrderHolder(order);
+        LinkedList<OrderHolder> orders = queue.computeIfAbsent(order.getPrice(), i -> new LinkedList<>());
+        synchronized (orders) {
             // Java LinkedList offers good performance here as we are always adding to the tail.
-            LinkedList<Order> orders = queue.computeIfAbsent(order.getPrice(), i -> new LinkedList<>());
-            orders.addLast(order);
+            orders.addLast(orderHolder);
+
+            // This next step is required as a concurrent remove() method may
+            // have just removed the 'orders' list from the map. This is the trade
+            // off for the finer grained locking.
+            queue.put(order.getPrice(), orders);
         }
 
-        mapIdToOrder.put(order.getId(), order);
+        mapIdToOrder.put(order.getId(), orderHolder);
         log.debug(() -> "addOrder() exits for order id:" + order.getId());
     }
 
     public void removeOrder(long id) throws Exception {
         log.debug(() -> "removeOrder() called for order id:" + id);
 
-        Order order = mapIdToOrder.get(id);
-        if ( order == null ) {
+        OrderHolder orderHolder = mapIdToOrder.get(id);
+        if ( orderHolder == null ) {
             log.warn(() -> "removeOrder() did not find order with id:" + id);
             return;
         }
 
-        Map<Double, LinkedList<Order> > queue = getQueueFromSide(order.getSide());
-
-        synchronized (queue) {
-            List<Order> orders = queue.get(order.getPrice());
-            if ( orders != null ) {
-                orders.remove(order);
-                if ( orders.size() == 0)
-                    queue.remove(order.getPrice());
+        Map<Double, LinkedList<OrderHolder> > queue = getQueueFromSide(orderHolder.getSide());
+        List<OrderHolder> orders = queue.get(orderHolder.getPrice());
+        if ( orders != null ) {
+            synchronized (orders) {
+                orders.remove(orderHolder);
+                if (orders.size() == 0)
+                    // This call below is why the addOrder() method does a final put().
+                    queue.remove(orderHolder.getPrice());
             }
-            else {
-                throw new Exception("removeOrder() did not find order with id:" + id);
-            }
-
-            mapIdToOrder.remove(id);
+        }
+        else {
+            throw new Exception("removeOrder() did not find order with id:" + id);
         }
 
+        mapIdToOrder.remove(id);
         log.debug(() -> "removeOrder() exits for order id:" + id);
     }
 
     public synchronized void modifyOrderSize(long id, long size) throws Exception {
         log.debug(() -> "modifyOrderSize() called for order id:" + id + " and size: " + size);
-        Order order = mapIdToOrder.get(id);
-        if ( order == null )
+        OrderHolder orderHolder = mapIdToOrder.get(id);
+        if ( orderHolder == null )
             return; // Might have already been removed by another thread
 
-        Object monitor = getQueueFromSide(order.getSide());
-        synchronized (monitor) {
-            // Need to re-check if this order has not been removed
-            // just now by another thread...
-            order = mapIdToOrder.get(id);
-            if ( order != null ) {
-                removeOrder(id);
-
-                if (size > 0)
-                    addOrder(new Order(id, order.getPrice(), order.getSide(), size)); // Use new size here
-            }
-        }
-
+        orderHolder.setSize(size);
         log.debug(() -> "modifyOrderSize() exits for order id:" + id + " and size: " + size);
     }
 
     public double getPriceForSideAndLevel(char side, int level) throws Exception {
         log.debug(() -> "getPriceForSideAndLevel() called for side:" + side + " and level: " + level);
-        Map<Double, LinkedList<Order> > queue = getQueueFromSide(side);
+        Map<Double, LinkedList<OrderHolder> > queue = getQueueFromSide(side);
 
-        Double[] prices;
-        synchronized (queue) {
-            prices = queue.keySet().toArray(new Double[0]);
-            if ( prices.length < level )
-                throw new Exception("Level " + level + " does not exist");
-        }
+        // ConcurrentSkipListMap will give a consistent snapshot at the time the keySet()
+        // is created.
+        Double[] prices = queue.keySet().toArray(new Double[0]);
+        if ( prices.length < level )
+            throw new Exception("Level " + level + " does not exist");
 
         log.debug(() -> "getPriceForSideAndLevel() returns: " + prices[level-1]);
         return prices[level-1];
@@ -109,38 +142,36 @@ public class OrderBook {
 
     public long getSizeForSideAndLevel(char side, int level) throws Exception {
         log.debug(() -> "getSizeForSideAndLevel() called for side:" + side + " and level: " + level);
-        Map<Double, LinkedList<Order> > queue = getQueueFromSide(side);
+        Map<Double, LinkedList<OrderHolder> > queue = getQueueFromSide(side);
 
-        long sum;
-        synchronized (queue) {
-            double price = getPriceForSideAndLevel(side, level);
-            LinkedList<Order> orders = queue.get(price);
-            if ( orders == null )
-                throw new Exception("Could not find size for side: " + side + " and level: " + level);
+        double price = getPriceForSideAndLevel(side, level);
+        LinkedList<OrderHolder> orders = queue.get(price);
+        if ( orders == null )
+            throw new Exception("Could not find size for side: " + side + " and level: " + level);
 
-            sum = orders.stream().mapToLong(Order::getSize).sum();
-        }
-
+        long sum = orders.stream().mapToLong(OrderHolder::getSize).sum();
         log.debug(() -> "getSizeForSideAndLevel() returns: " + sum);
         return sum;
     }
 
 
     public List<Order> getOrdersForSide(char side) throws Exception {
-        Map<Double, LinkedList<Order> > queue = getQueueFromSide(side);
+        Map<Double, LinkedList<OrderHolder> > queue = getQueueFromSide(side);
 
         List<Order> rv = new LinkedList<>();
-        synchronized (queue) {
-            // Our container classes will have done all the hard work for us....
-            queue.entrySet().stream().forEach( es -> rv.addAll(es.getValue()));
-        }
+
+        // Our container classes will have done all the hard work for us....
+        queue.entrySet().stream().forEach( es -> rv.addAll(
+                es.getValue().stream()
+                        .map(o -> new Order(o.getId(), o.getPrice(), o.getSide(), o.getSize()))
+                        .collect(Collectors.toList())
+        ));
 
         return rv;
     }
 
-    // To offer finer granularity (and hence greater throughput) than object level synchronisation
-    // we synchronise based on the side.
-    private Map<Double, LinkedList<Order> > getQueueFromSide(char side) throws Exception {
+    // Get the bid or the offer queue.
+    private Map<Double, LinkedList<OrderHolder> > getQueueFromSide(char side) throws Exception {
         if ( side == 'B' ) {
             return bidQueue;
         }
