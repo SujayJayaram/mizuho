@@ -12,16 +12,16 @@ import java.util.stream.Collectors;
 public class OrderBook {
     private static final Logger log = LogManager.getLogger(OrderBook.class);
 
-    // In reality the OrderBook would be per security Id (e.g. ISIN, CUSIP etc) so we may
+    // In reality the OrderBook would be per security Id (e.g. ISIN, CUSIP etc.) so we may
     // wish to store that in this object as well.
     public OrderBook() {}
 
     // Internal class allowing size to be changed
     private static class OrderHolder {
-        private long id; // id of order
-        private double price;
-        private char side; // B "Bid" or O "Offer"
-        private AtomicLong size;
+        private final long id; // id of order
+        private final double price;
+        private final char side; // B "Bid" or O "Offer"
+        private final AtomicLong size;
 
         private OrderHolder(Order order) {
             this.id = order.getId();
@@ -59,11 +59,11 @@ public class OrderBook {
     // The Map declares a <LinkedList> type in the generics (rather than just a List) as
     // we can then use the addLast() method which has O[1] in Java, as the LinkedList
     // class maintains a reference to its tail.
-    private Map<Double, LinkedList<OrderHolder> > bidQueue = new ConcurrentSkipListMap<>(Comparator.reverseOrder());
-    private Map<Double, LinkedList<OrderHolder> > offerQueue = new ConcurrentSkipListMap<>();
+    private final Map<Double, LinkedList<OrderHolder> > bidQueue = new ConcurrentSkipListMap<>(Comparator.reverseOrder());
+    private final Map<Double, LinkedList<OrderHolder> > offerQueue = new ConcurrentSkipListMap<>();
 
     // No need to sort keys by order here, so we can use a ConcurrentHashMap which offers O[1] performance
-    private Map<Long, OrderHolder> mapIdToOrder = new ConcurrentHashMap<>();
+    private final Map<Long, OrderHolder> mapIdToOrder = new ConcurrentHashMap<>();
 
     public void addOrder(Order order) throws Exception {
         log.debug(() -> "addOrder() called for order id:" + order.getId());
@@ -80,8 +80,8 @@ public class OrderBook {
             orders.addLast(orderHolder);
 
             // This next step is required as a concurrent remove() method may
-            // have just removed the 'orders' list from the map. This is the trade
-            // off for the finer grained locking.
+            // have just removed the 'orders' list from the map. This is the
+            // trade-off for the finer grained locking.
             queue.put(order.getPrice(), orders);
         }
 
@@ -163,8 +163,8 @@ public class OrderBook {
         List<Order> rv = new LinkedList<>();
 
         // Our container classes will have done all the hard work for us....
-        queue.entrySet().stream().forEach( es -> rv.addAll(
-                es.getValue().stream()
+        queue.forEach((key, value) -> rv.addAll(
+                value.stream()
                         .map(o -> new Order(o.getId(), o.getPrice(), o.getSide(), o.getSize()))
                         .collect(Collectors.toList())
         ));

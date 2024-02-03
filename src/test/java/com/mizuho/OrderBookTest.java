@@ -60,9 +60,7 @@ class OrderBookTest {
     public void testErrorInSideChar() {
         OrderBook orderBook = new OrderBook();
 
-        Exception exception = assertThrows(Exception.class, () -> {
-            orderBook.addOrder(new Order(1, 96.0, 'X', 100));
-        });
+        Exception exception = assertThrows(Exception.class, () -> orderBook.addOrder(new Order(1, 96.0, 'X', 100)));
 
         String actualMessage = exception.getMessage();
         assertThat(actualMessage, equalTo("Unknown side: X"));
