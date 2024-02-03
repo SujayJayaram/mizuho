@@ -13,17 +13,21 @@ class OrderBookTest {
     static final char BID = 'B';
 
     @Test
-    public void testAddOrderForOffer() {
+    public void testAddOrderForOfferWithLevels() {
         try {
             OrderBook orderBook = new OrderBook();
             orderBook.addOrder(new Order(1, 96.0, OFFER, 100L));
             orderBook.addOrder(new Order(2, 99.0, OFFER, 100L));
             orderBook.addOrder(new Order(3, 94.0, OFFER, 100L));
+            orderBook.addOrder(new Order(4, 96.0, OFFER, 300L));
 
             List<Order> ordersForSide = orderBook.getOrdersForSide(OFFER);
             assertThat(ordersForSide.get(0).getPrice(), equalTo(94.0));
             assertThat(ordersForSide.get(1).getPrice(), equalTo(96.0));
-            assertThat(ordersForSide.get(2).getPrice(), equalTo(99.0));
+            assertThat(ordersForSide.get(1).getSize(), equalTo(100L));
+            assertThat(ordersForSide.get(2).getPrice(), equalTo(96.0));
+            assertThat(ordersForSide.get(2).getSize(), equalTo(300L));
+            assertThat(ordersForSide.get(3).getPrice(), equalTo(99.0));
         }
         catch(Exception e) {
             assert(false);
@@ -31,17 +35,21 @@ class OrderBookTest {
     }
 
     @Test
-    public void testAddOrderForBid() {
+    public void testAddOrderForBidWithLevels() {
         try {
             OrderBook orderBook = new OrderBook();
             orderBook.addOrder(new Order(1, 96.0, BID, 100L));
             orderBook.addOrder(new Order(2, 99.0, BID, 100L));
             orderBook.addOrder(new Order(3, 94.0, BID, 100L));
+            orderBook.addOrder(new Order(4, 96.0, BID, 300L));
 
             List<Order> ordersForSide = orderBook.getOrdersForSide(BID);
             assertThat(ordersForSide.get(0).getPrice(), equalTo(99.0));
             assertThat(ordersForSide.get(1).getPrice(), equalTo(96.0));
-            assertThat(ordersForSide.get(2).getPrice(), equalTo(94.0));
+            assertThat(ordersForSide.get(1).getSize(), equalTo(100L));
+            assertThat(ordersForSide.get(2).getPrice(), equalTo(96.0));
+            assertThat(ordersForSide.get(2).getSize(), equalTo(300L));
+            assertThat(ordersForSide.get(3).getPrice(), equalTo(94.0));
         }
         catch(Exception e) {
             assert(false);
