@@ -119,12 +119,20 @@ public class OrderBook {
 
     public synchronized void modifyOrderSize(long id, long size) throws Exception {
         log.debug(() -> "modifyOrderSize() called for order id:" + id + " and size: " + size);
-        OrderHolder orderHolder = mapIdToOrder.get(id);
-        if ( orderHolder == null ) {
-            throw new Exception("Could not find order with id: " + id); // Might have already been removed by another thread
+
+        if ( size == 0 ) {
+            log.debug(() -> "removing order as it has zero size - order id:" + id);
+            removeOrder(id);
+        }
+        else {
+            OrderHolder orderHolder = mapIdToOrder.get(id);
+            if (orderHolder == null) {
+                throw new Exception("Could not find order with id: " + id); // Might have already been removed by another thread
+            }
+
+            orderHolder.setSize(size);
         }
 
-        orderHolder.setSize(size);
         log.debug(() -> "modifyOrderSize() exits for order id:" + id + " and size: " + size);
     }
 

@@ -130,9 +130,33 @@ class OrderBookTest {
             long sizeForSideAndLevel = orderBook.getSizeForSideAndLevel(BID, 2);
             assertThat(sizeForSideAndLevel, equalTo(400L));
 
-            orderBook.modifyOrderSize(3, 500);
+            orderBook.modifyOrderSize(3, 500L);
             long sizeForSideAndLevel2 = orderBook.getSizeForSideAndLevel(BID, 2);
             assertThat(sizeForSideAndLevel2, equalTo(600L));
+        }
+        catch(Exception e) {
+            assert(false);
+        }
+    }
+
+    @Test
+    public void testModifyOrderToZeroSize() {
+        try {
+            OrderBook orderBook = new OrderBook();
+            orderBook.addOrder(new Order(1, 96.0, BID, 100L));
+            orderBook.addOrder(new Order(2, 99.0, BID, 100L));
+            orderBook.addOrder(new Order(3, 96.0, BID, 300L));
+
+            long sizeForSideAndLevel = orderBook.getSizeForSideAndLevel(BID, 2);
+            assertThat(sizeForSideAndLevel, equalTo(400L));
+
+            orderBook.modifyOrderSize(3, 0L);
+            long sizeForSideAndLevel2 = orderBook.getSizeForSideAndLevel(BID, 2);
+            assertThat(sizeForSideAndLevel2, equalTo(100L));
+
+            List<Order> ordersForSide = orderBook.getOrdersForSide(BID);
+            assertThat(ordersForSide.size(), equalTo(2));
+
         }
         catch(Exception e) {
             assert(false);
