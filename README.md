@@ -30,11 +30,10 @@ bucket sizes (HashMap uses a tree instead of a Linked List for large buckets)
 - Should have a timestamp attribute (to microsec precision for MiFID2)
 - Might want to contain an order type (e.g. "Good Till Day", "Good Till Cancel", "All Or Nothing","Immediate Or Cancel" etc)
 - Might want to support Iceberg orders (e.g. there might be a "shownSize" and "fullSize" etc)
-- Might want a setter for size.
+- Might want a setter for size. This would allow us to remove the inner OrderHolder class.
 - Instead of using a char for side ("B" or "O") could use enums - this would lead to less character creation. Enums use the FlyWeight
 design patter meaning there is only ever two (enum) instances created.
 
 OrderBook Class
-- Might want the functionality for to match off orders and create Trades
-- 
+- Might want the functionality to match off orders where appropriate and create Trades
 
