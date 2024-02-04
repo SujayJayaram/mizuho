@@ -57,6 +57,24 @@ class OrderBookTest {
     }
 
     @Test
+    public void testAddSameOrderTwice() {
+        try {
+            OrderBook orderBook = new OrderBook();
+
+            Exception exception = assertThrows(Exception.class, () -> {
+                orderBook.addOrder(new Order(1, 96.0, BID, 100L));
+                orderBook.addOrder(new Order(1, 96.0, BID, 100L));
+            });
+
+            String actualMessage = exception.getMessage();
+            assertThat(actualMessage, equalTo("OrderBook already contains order with id: 1"));
+        }
+        catch(Exception e) {
+            assert(false);
+        }
+    }
+
+    @Test
     public void testErrorInSideChar() {
         OrderBook orderBook = new OrderBook();
 

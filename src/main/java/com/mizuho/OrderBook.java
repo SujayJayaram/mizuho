@@ -71,6 +71,9 @@ public class OrderBook {
         if ( order.getSize() <= 0 || order.getPrice() <= 0.0 )
             throw new Exception("Invalid size or price for order with id: " + order.getId());
 
+        if ( mapIdToOrder.get(order.getId()) != null )
+            throw new Exception("OrderBook already contains order with id: " + order.getId());
+
         Map<Double, LinkedList<OrderHolder> > queue = getQueueFromSide(order.getSide());
 
         OrderHolder orderHolder = new OrderHolder(order);
