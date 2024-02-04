@@ -11,9 +11,19 @@ This project is for my submission to the Mizuho eTrading Team (Sujit Nair).
 Similarly for non latency sensitive code, we would check that order id params are not zero or negative, but here, we rely on the caller
 supplying valid values - its a matter of system policy.
 
-In terms of synchronisation/locking policy, there is a simple solution which would lock the respective bid or offer queue
-but this would offer less throughput as the locking is corase grained. I have chosen to minimise locking to show my abilities.
+In terms of synchronisation/locking policy, there is a simpler solution which would lock the respective bid or offer queue
+but this would offer less throughput as the locking is more coarse grained. I have chosen to minimise locking to show my abilities.
 However I tend to prefer a simpler solution where possible and then look to make optimisations like this only if absolutely necessary.
+
+Within the OrderBook class, I have chosen to use the ConcurrentSkipListMap container. This class offers O[log(n)] performance as opposed to 
+the near O[1] performance of the HashMap class, but I am using this container because we need to obtain the keys in sorted order.
+Without knowing more about the frequency and latency requirements of the getPriceForSideAndLevel(), getSizeForSideAndLevel() and
+getOrdersForSide() methods, the sizes of the bid and offer 'queues', and the data volumes and number of levels found in each side,
+it's not easy to know which would be the best container to use. (HashMap would offer better insert/remove performance but the key set would
+need to be manually sorted each time).
+
+Had we only wanted to see level 1 order book data (i.e. top of book and did not want to see depth of market or organise into levels), 
+then a PriorityBlockingQueue class (i.e. thread safe heap) would perhaps be a better container choice.
 
 - I assume I cannot change the Order class hence creating an OrderHolder class
 - I tend to write equals() and hashCode() for all Pojos (and also make them 

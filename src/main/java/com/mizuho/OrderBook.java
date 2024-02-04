@@ -51,11 +51,6 @@ public class OrderBook {
         }
     }
 
-    // Time complexity to insert or remove an element from a ConcurrentSkipListMap is O[log(n)]
-    // Had we only wanted to see level 1 order book data (did not want to see depth of
-    // market), then a PriorityBlockingQueue class (i.e. thread safe heap) would perhaps
-    // be more appropriate, but as we need to see market depth too, I am using the
-    // ConcurrentSkipListMap class.
     // The Map declares a <LinkedList> type in the generics (rather than just a List) as
     // we can then use the addLast() method which has O[1] in Java, as the LinkedList
     // class maintains a reference to its tail.
