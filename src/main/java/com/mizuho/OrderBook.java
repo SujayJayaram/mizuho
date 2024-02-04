@@ -159,7 +159,11 @@ public class OrderBook {
         if ( orders == null )
             throw new Exception("Could not find size for side: " + side + " and level: " + level);
 
-        long sum = orders.stream().mapToLong(OrderHolder::getSize).sum();
+        long sum;
+        synchronized (orders) {
+            sum = orders.stream().mapToLong(OrderHolder::getSize).sum();
+        }
+
         log.debug(() -> "getSizeForSideAndLevel() returns: " + sum);
         return sum;
     }
@@ -171,11 +175,16 @@ public class OrderBook {
         List<Order> rv = new LinkedList<>();
 
         // Our container classes will have done all the hard work for us....
-        queue.forEach((key, value) -> rv.addAll(
-                value.stream()
-                        .map(o -> new Order(o.getId(), o.getPrice(), o.getSide(), o.getSize()))
-                        .collect(Collectors.toList())
-        ));
+        queue.forEach((key, value) -> {
+                    if (value != null) {
+                        synchronized (value) {
+                            rv.addAll(value.stream()
+                                            .map(o -> new Order(o.getId(), o.getPrice(), o.getSide(), o.getSize()))
+                                            .collect(Collectors.toList()));
+                        }
+                    }
+                }
+        );
 
         return rv;
     }
