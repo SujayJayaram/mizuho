@@ -20,7 +20,7 @@ the near O[1] performance of the HashMap class, but I am using this container be
 Without knowing more about the frequency and latency requirements of the getPriceForSideAndLevel(), getSizeForSideAndLevel() and
 getOrdersForSide() methods, the sizes of the bid and offer 'queues', and the data volumes and number of levels found in each side,
 it's not easy to know which would be the best container to use. (HashMap would offer better insert/remove performance but the key set would
-need to be manually sorted each time).
+need to be manually sorted each time at a cost of O[klog(k)] where k is the number of keys/levels).
 
 Had we only wanted to see level 1 order book data (i.e. top of book and did not want to see depth of market or organise into levels), 
 then a PriorityBlockingQueue class (i.e. thread safe heap) would perhaps be a better container choice.
