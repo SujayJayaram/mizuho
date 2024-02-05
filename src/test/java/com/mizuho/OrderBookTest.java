@@ -16,18 +16,18 @@ class OrderBookTest {
     public void testAddOrderForOfferWithLevels() {
         try {
             OrderBook orderBook = new OrderBook();
-            orderBook.addOrder(new Order(1, 96.0, OFFER, 100L));
-            orderBook.addOrder(new Order(2, 99.0, OFFER, 100L));
-            orderBook.addOrder(new Order(3, 94.0, OFFER, 100L));
-            orderBook.addOrder(new Order(4, 96.0, OFFER, 300L));
+            orderBook.addOrder(new Order(1, 100.0, OFFER, 100L));
+            orderBook.addOrder(new Order(2, 103.0, OFFER, 100L));
+            orderBook.addOrder(new Order(3, 98.0, OFFER, 100L));
+            orderBook.addOrder(new Order(4, 100.0, OFFER, 300L));
 
             List<Order> ordersForSide = orderBook.getOrdersForSide(OFFER);
-            assertThat(ordersForSide.get(0).getPrice(), equalTo(94.0));
-            assertThat(ordersForSide.get(1).getPrice(), equalTo(96.0));
+            assertThat(ordersForSide.get(0).getPrice(), equalTo(98.0));
+            assertThat(ordersForSide.get(1).getPrice(), equalTo(100.0));
             assertThat(ordersForSide.get(1).getSize(), equalTo(100L));
-            assertThat(ordersForSide.get(2).getPrice(), equalTo(96.0));
+            assertThat(ordersForSide.get(2).getPrice(), equalTo(100.0));
             assertThat(ordersForSide.get(2).getSize(), equalTo(300L));
-            assertThat(ordersForSide.get(3).getPrice(), equalTo(99.0));
+            assertThat(ordersForSide.get(3).getPrice(), equalTo(103.0));
         }
         catch(Exception e) {
             assert(false);
